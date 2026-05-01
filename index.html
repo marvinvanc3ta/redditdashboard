@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RedditStats</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23E05A2B'/><text x='50%25' y='50%25' dominant-baseline='central' text-anchor='middle' font-family='-apple-system,sans-serif' font-weight='700' font-size='20' fill='white'>R</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0f0f0f;--surf:#1a1a1a;--surf2:#242424;--bdr:rgba(255,255,255,0.08);
+  --tx:#f0ede8;--tx2:#a09d97;--tx3:#5a5754;
+  --blue:#E05A2B;--bl:rgba(224,90,43,0.12);--bld:#ff7043;
+  --green:#4CAF50;--red:#ef5350;--redl:rgba(239,83,80,0.12);
+  --r:10px;--rs:6px;
+}
+body{font-family:-apple-system,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+header{background:var(--surf);border-bottom:0.5px solid var(--bdr);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:20;}
+.logo{font-size:15px;font-weight:700;letter-spacing:-0.02em;}
+.logo span{color:var(--blue);}
+.hbtns{display:flex;align-items:center;gap:10px;}
+.sync{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--tx3);}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--tx3);flex-shrink:0;}
+.sdot.ok{background:#4CAF50;}.sdot.busy{background:#D4A017;animation:blink 1s infinite;}.sdot.err{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.container{max-width:1400px;margin:0 auto;padding:1.5rem;}
+/* tabs */
+.tabs{display:flex;gap:6px;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center;}
+.tab{padding:6px 14px;border-radius:20px;border:0.5px solid var(--bdr);font-size:13px;cursor:pointer;background:var(--surf);color:var(--tx2);transition:all .15s;}
+.tab:hover{background:var(--surf2);}
+.tab.active{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:500;}
+.tab-add{background:transparent;color:var(--tx3);border-style:dashed;}
+.tab-add:hover{color:var(--blue);border-color:var(--blue);}
+/* empty */
+.empty-state{text-align:center;padding:4rem 2rem;color:var(--tx3);}
+.empty-state h2{font-size:18px;font-weight:600;color:var(--tx2);margin-bottom:8px;}
+.empty-state p{font-size:14px;margin-bottom:1.5rem;}
+/* metrics */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1.25rem;}
+.mcard{background:var(--surf);border:0.5px solid var(--bdr);border-radius:var(--r);padding:1rem 1.25rem;}
+.mlabel{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.mval{font-size:24px;font-weight:700;color:var(--tx);line-height:1;}
+.msub{font-size:11px;color:var(--tx3);margin-top:3px;}
+/* topbar */
+.topbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:1rem;}
+.topbar select,.topbar input[type=month]{font-size:13px;padding:7px 10px;border-radius:var(--rs);border:0.5px solid var(--bdr);background:var(--surf);color:var(--tx);outline:none;cursor:pointer;}
+/* card */
+.card{background:var(--surf);border:0.5px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem;}
+.ctitle{font-size:12px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;}
+/* grid table */
+.gwrap{overflow-x:auto;overflow-y:visible;border-radius:var(--rs);border:0.5px solid var(--bdr);}
+.gtable{border-collapse:collapse;font-size:11px;min-width:100%;}
+.gtable th{background:var(--surf);position:sticky;top:0;z-index:5;border-bottom:1px solid var(--bdr);white-space:nowrap;}
+.gtable th.dh{position:sticky;left:0;z-index:8;background:var(--surf);min-width:70px;}
+.gtable td.dc{position:sticky;left:0;background:#1e1e1e;z-index:6;font-size:11px;font-weight:600;color:var(--tx2);white-space:nowrap;border-right:1px solid var(--bdr);padding:0 8px;min-width:70px;height:28px;}
+.gtable td.dc.wk{background:#181818;color:var(--tx3);}
+.gtable td.dc.td{background:rgba(224,90,43,0.15);color:var(--bld);}
+.gtable td.ic{padding:0;border-right:0.5px solid var(--bdr);border-bottom:0.5px solid var(--bdr);}
+.gtable tr:last-child td{border-bottom:none;}
+.ci{width:100%;height:28px;border:none;outline:none;background:transparent;text-align:center;font-size:11px;font-family:-apple-system,sans-serif;color:var(--tx);padding:0 4px;min-width:80px;}
+.ci:focus{background:rgba(224,90,43,0.1);color:var(--bld);}
+.ci.hv{background:rgba(224,90,43,0.07);font-weight:500;}
+.ci.hv:focus{background:rgba(224,90,43,0.15);}
+.sdiv{border-right:2px solid var(--bg)!important;}
+/* chart */
+.ccontrols{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem;}
+.bm{font-size:12px;padding:5px 12px;border-radius:20px;border:0.5px solid var(--bdr);background:var(--surf);color:var(--tx2);cursor:pointer;}
+.bm.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+.cwrap{position:relative;width:100%;height:300px;}
+.cleg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+.li{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2);}
+.ld{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+/* sub dd */
+.sdwrap{position:relative;display:inline-block;}
+.sdbtn{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:var(--rs);border:0.5px solid var(--bdr);background:var(--surf);color:var(--tx2);font-size:12px;cursor:pointer;white-space:nowrap;}
+.sdbtn:hover{background:var(--surf2);}
+.sddd{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--surf);border:0.5px solid var(--bdr);border-radius:var(--r);box-shadow:0 8px 24px rgba(0,0,0,.1);z-index:50;min-width:240px;max-height:300px;overflow-y:auto;}
+.sddd.open{display:block;}
+.sdddh{padding:8px 12px;border-bottom:0.5px solid var(--bdr);display:flex;gap:6px;}
+.sopt{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:12px;cursor:pointer;}
+.sopt:hover{background:var(--bg);}
+.sopt input{accent-color:var(--blue);}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.gl{padding:6px 12px 2px;font-size:10px;font-weight:600;color:var(--tx3);text-transform:uppercase;border-top:0.5px solid var(--bdr);}
+.gl:first-child{border-top:none;}
+/* buttons */
+button{font-family:-apple-system,sans-serif;cursor:pointer;font-size:13px;border-radius:var(--rs);border:0.5px solid var(--bdr);padding:7px 14px;background:var(--surf);color:var(--tx);transition:all .15s;}
+button:hover{background:var(--surf2);}
+.bp{background:var(--blue);color:#fff;border-color:var(--blue);}
+.bp:hover{background:var(--bld);}
+.bs{font-size:11px;padding:4px 10px;}
+/* modal */
+.moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;}
+.moverlay.open{display:flex;}
+.modal{background:var(--surf);border-radius:var(--r);padding:1.5rem;width:560px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.4);max-height:90vh;overflow-y:auto;border:0.5px solid var(--bdr);}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:1.25rem;}
+/* seg manager */
+.sitem{border:0.5px solid var(--bdr);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px;background:#111;}
+.sih{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.sbadge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(224,90,43,0.15);color:var(--bld);cursor:pointer;transition:all .1s;}
+.chip.dis{background:#222;color:var(--tx3);opacity:.6;}
+.chip .xtog{border:none;background:none;padding:0;font-size:13px;cursor:pointer;line-height:1;min-width:auto;}
+.arow{display:flex;gap:6px;margin-top:4px;}
+.arow input{flex:1;font-size:12px;padding:6px 8px;border-radius:var(--rs);border:0.5px solid var(--bdr);background:var(--surf2);color:var(--tx);outline:none;}
+.arow input:focus{border-color:var(--blue);}
+.mfooter{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem;}
+.expbar{display:flex;justify-content:flex-end;gap:8px;margin-top:1rem;padding-top:1rem;border-top:0.5px solid var(--bdr);}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+.searchwrap{display:flex;align-items:center;gap:6px;}
+.searchbox{position:relative;display:inline-flex;align-items:center;}
+.searchinp{font-size:13px;padding:6px 10px;border-radius:var(--rs);border:0.5px solid var(--bdr);background:var(--surf);color:var(--tx);outline:none;width:200px;transition:all .15s;}
+.searchinp:focus{border-color:var(--blue);width:260px;}
+.searchinp::placeholder{color:var(--tx3);}
+.searchclear{position:absolute;right:6px;background:none;border:none;padding:0;font-size:15px;color:var(--tx3);cursor:pointer;line-height:1;display:none;}
+.searchclear.vis{display:block;}
+.searchnav{display:flex;align-items:center;gap:4px;}
+.searchnav button{font-size:11px;padding:3px 8px;border-radius:var(--rs);}
+.searchcount{font-size:11px;color:var(--tx3);white-space:nowrap;}
+.col-highlight{outline:2px solid var(--blue)!important;background:rgba(224,90,43,0.08)!important;}
+.col-highlight-active{outline:2px solid var(--bld)!important;background:rgba(224,90,43,0.15)!important;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Reddit<span>Stats</span></div>
+  <div class="hbtns">
+    <div class="sync"><span class="sdot" id="sdot"></span><span id="slabel">Não conectado</span></div>
+    <button id="gbtn" onclick="handleAuth()" style="font-size:12px;padding:5px 12px;">Conectar Google</button>
+    <button onclick="openSeg()" style="font-size:12px;padding:5px 12px;">Gerenciar subreddits</button>
+  </div>
+</header>
+
+<div class="container">
+  <h2 class="sr-only">Dashboard Reddit</h2>
+  <div class="tabs" id="tabs"></div>
+  <div id="main"></div>
+</div>
+
+<!-- Seg modal -->
+<div class="moverlay" id="segModal">
+  <div class="modal">
+    <h3>Gerenciar subreddits por segmento</h3>
+    <p style="font-size:12px;color:var(--tx3);margin-bottom:1rem;">Clique num subreddit para ativar/desativar. Use o campo abaixo de cada segmento para adicionar novos.</p>
+    <div id="segBody"></div>
+    <div class="mfooter"><button onclick="closeSeg()">Fechar</button></div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ──
+const SEGS = ['GENERAL','BOOBS','BOOTY','PUSSY','NICHED','PETIT','BLONDE','LATINA','TATTOO','TRANS'];
+const DEF = {
+  'GENERAL':['r/GirlfriendsNSFW','r/TheOnesYouLustOver','r/sensualcurves','r/SexyButNotNude','r/GooningGalore','r/ratemynudeselfie1','r/webcamgirlsnsfw','r/CollegeFuckDoll','r/underwearteases','r/Gonewild18','r/AdorableNudes','r/Nude_Selfie','r/18_19','r/PerfectBody','r/CamGirls','r/homemadexxx','r/amihot','r/SexyButNotPorn','r/goodgirlz4u','r/NudeGirlsHub','r/Naked','r/07nsfw','r/2007gw'],
+  'BOOBS':['r/TinyTitsAreBeautiful','r/CuteLittleTits','r/PetiteTitsEveryday','r/SmallBreastsAreBest','r/smalltitsarebest','r/aa_cups','r/A_Cups','r/B_Cups','r/PetiteTits','r/smallboobs','r/TinyTits','r/GoonForBoobs','r/boobsandtetasNSFW','r/ratemyboobs','r/AdorableBoobs','r/BeautifulBoobs_','r/mykindoftits','r/BoobsNation','r/boobsandboobs','r/TitsTrove','r/topless','r/OnlyNaturalBoobs','r/NaturalBoobs','r/FantasticBreasts','r/PerfectTits','r/BestTits','r/naturaltitties','r/boobs','r/tits','r/boltedontits','r/trulybigtits','r/BigBoobsClub','r/massivetits','r/BigTitsAdmirer','r/bestbigbreasts','r/BigBoobLife','r/HumongousChests','r/BigBoobsUnited','r/bigtitsandmilkers','r/Busty_Girls','r/BUSTYQUEENS','r/BigTitsHotties','r/Huge_Udders','r/largemilkers','r/biggerthanherhead','r/BigBreastedGirls','r/BigTitsHeaven','r/Largenaturaltits','r/BigBoobsGonewild','r/HugeBoobsNatural','r/BustyNaturals','r/2busty2hide'],
+  'BOOTY':['r/Booty_Lovers','r/booty','r/ass','r/GoonForAss','r/AssClappersINC','r/BootyInThong','r/assinathong','r/assgirls','r/LittleWaistBigAss','r/Backview','r/RateMyAssNSFW','r/BigAssAdmirer','r/RateMyAss_','r/BubbleButts','r/RateMyAss','r/addicted_to_Ass','r/bigbrownassholes'],
+  'PUSSY':['r/OnlyShavedGirls','r/pussy','r/MeatyVaginas','r/shavedpussies','r/needypussy'],
+  'NICHED':['r/Ribcage','r/Tanlines_Gone_Wild','r/SkinnyStarlets','r/BellyButtonWorld','r/GodlyFeet','r/FootTalk','r/Tongue0ut','r/smalltitsbigass','r/tiktokporn','r/tiktoknsfw','r/TikTok_gif','r/Ahegaohaven','r/tongue_girls','r/palegirls'],
+  'PETIT':['r/Petite_Women','r/PocketSizedSluts','r/petitegirlie','r/PetiteMasterpiece','r/SmallGirlsLover','r/skinnywhitegirls','r/Petite_18','r/petitexs','r/PetiteTeensGoneWild','r/SmallCutie','r/xsmallgirls','r/ExtraSmall','r/PetiteButDom','r/smallblondies','r/SexiestPetites','r/PetiteAndTiny','r/funsized','r/PetiteGoneWild','r/petite','r/TinyCuteTeen','r/tiny18_21','r/bootypetite'],
+  'BLONDE':['r/Blonde','r/HotBlondes_','r/Blonde_Bombshells','r/AltBlonde'],
+  'LATINA':['r/SoCalLatina','r/latinaAdmirer','r/Latinas_amatuer_only','r/LatinaLustLand','r/latinasruledaworld','r/latinas','r/LatinaTeensGoneWild','r/SexBrunette','r/Brunette_Vixens'],
+  'TATTOO':['r/TattooNSFW','r/hotgirlswithtattoos','r/TattedAndSlutty','r/tattooedgonewild','r/TattooedSluts','r/AltGirls','r/TattooGirls','r/GirlswithTatsGW','r/TattooedWhoress','r/Hotchickswithtattoos'],
+  'TRANS':['r/TGirl_Feet','r/EverythingTrap_Trans','r/latina_trans','r/traps','r/SexyTransGirl','r/transgoddesses','r/trapsgonewild','r/TransGirlsCum','r/EliteTransGirls','r/Sissies','r/GoonToTransDick','r/hornytrans','r/Sissiesinaction','r/transporn','r/tspetite','r/dickgirls','r/SissyInspiration','r/TgirlsPorn','r/TransExplicit','r/TGirlSluts','r/OnlyIfShesPackin','r/ShemalesNew','r/Massiver_Shemale_Hahn']
+};
+const SEGCOL={
+  'GENERAL':'#E6F1FB|#0C447C','BOOBS':'#FAEEDA|#633806',
+  'BOOTY':'#EEEDFE|#26215C','PUSSY':'#FCEBEB|#791F1F',
+  'NICHED':'#E1F5EE|#085041','PETIT':'#FAECE7|#712B13','BLONDE':'#fef9c3|#713f12',
+  'LATINA':'#EAF3DE|#173404','TATTOO':'#F1EFE8|#444441','TRANS':'#fce7f3|#831843'
+};
+const CC=['#185FA5','#E05A2B','#27A068','#9B46B0','#D4A017','#C0392B','#1ABC9C','#8E44AD','#2980B9','#F39C12','#16A085','#D35400','#2C3E50','#E74C3C','#3498DB','#F1C40F','#1E8449','#6C3483','#117A65','#B7950B'];
+const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DN=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const GS_CLIENT_ID='96860927609-hhg68hehp38cmo784mf1lkolfahl2fia.apps.googleusercontent.com';
+const GS_SHEET_ID='1HImuhosRFru6CjX7aJ2W9hphtA4j5raLTGgCQmoHB1Y';
+const GS_SCOPE='https://www.googleapis.com/auth/spreadsheets';
+
+function sbg(s){return (SEGCOL[s]||'#E6F1FB|#0C447C').split('|')[0];}
+function sfg(s){return (SEGCOL[s]||'#E6F1FB|#0C447C').split('|')[1];}
+function allSubsFlat(){return SEGS.flatMap(s=>ST.segs[s]||[]);}
+function colSub(sub){const a=allSubsFlat();return CC[a.indexOf(sub)%CC.length]||'#888';}
+function activeSubs(seg){const dis=ST.dis[seg]||[];return (ST.segs[seg]||[]).filter(s=>!dis.includes(s));}
+function allActive(){return SEGS.flatMap(s=>activeSubs(s));}
+function dim(y,m){return new Date(y,m+1,0).getDate();}
+function ds(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+function today(){const t=new Date();return ds(t.getFullYear(),t.getMonth(),t.getDate());}
+function dkey(date,sub,metric){return `${ST.clients[ST.active]}|${date}|${sub}|${metric}`;}
+function gv(date,sub,metric){return ST.data[dkey(date,sub,metric)]||'';}
+function sv(date,sub,metric,val){
+  const k=dkey(date,sub,metric);
+  if(val===''||val===null)delete ST.data[k]; else ST.data[k]=val;
+  save(); updMetrics(); updChart();
+}
+
+// ── STATE ──
+const now=new Date();
+const ST={
+  clients:JSON.parse(localStorage.getItem('rs_clients')||'[]'),
+  segs:JSON.parse(localStorage.getItem('rs_segs')||JSON.stringify(DEF)),
+  dis:JSON.parse(localStorage.getItem('rs_dis')||'{}'),
+  data:JSON.parse(localStorage.getItem('rs_data')||'{}'),
+  active:0, year:now.getFullYear(), month:now.getMonth(),
+  cm:'views', csubs:[], selSegs:[]
+};
+
+function save(){
+  localStorage.setItem('rs_clients',JSON.stringify(ST.clients));
+  localStorage.setItem('rs_segs',JSON.stringify(ST.segs));
+  localStorage.setItem('rs_dis',JSON.stringify(ST.dis));
+  localStorage.setItem('rs_data',JSON.stringify(ST.data));
+  schedGSave();
+}
+
+// ── TABS ──
+function renderTabs(){
+  document.getElementById('tabs').innerHTML=
+    ST.clients.map((c,i)=>{
+      const active=i===ST.active;
+      return `<button class="tab${active?' active':''}" onclick="setClient(${i})">${c}&nbsp;<span onclick="event.stopPropagation();delClient(${i})" style="opacity:.6;font-size:12px;pointer-events:all;">×</span></button>`;
+    }).join('')+
+    `<button class="tab tab-add" onclick="addClient()">+ Cliente</button>`;
+}
+function editClient(i){
+  const n=prompt('Novo nome da cliente:',ST.clients[i]);
+  if(!n||!n.trim()||n.trim()===ST.clients[i])return;
+  const old=ST.clients[i];const novo=n.trim();
+  // rename all data keys
+  const newData={};
+  Object.entries(ST.data).forEach(([k,v])=>{
+    newData[k.startsWith(old+'|')?novo+k.slice(old.length):k]=v;
+  });
+  ST.data=newData;
+  ST.clients[i]=novo;
+  save();buildAll();
+}
+function setClient(i){ST.active=i;ST.csubs=[];renderTabs();buildMain();}
+function addClient(){
+  const n=prompt('Nome da cliente:');if(!n||!n.trim())return;
+  ST.clients.push(n.trim());ST.active=ST.clients.length-1;save();buildAll();
+}
+function delClient(i){
+  if(!confirm(`Remover "${ST.clients[i]}"?`))return;
+  const nm=ST.clients[i];
+  Object.keys(ST.data).forEach(k=>{if(k.startsWith(nm+'|'))delete ST.data[k];});
+  ST.clients.splice(i,1);
+  if(ST.active>=ST.clients.length)ST.active=Math.max(0,ST.clients.length-1);
+  save();buildAll();
+}
+
+// ── MAIN ──
+function buildMain(){
+  const el=document.getElementById('main');
+  if(!ST.clients.length){
+    el.innerHTML=`<div class="empty-state"><h2>Nenhuma cliente cadastrada</h2><p>Clique em "+ Cliente" para começar</p></div>`;
+    return;
+  }
+  const clientName=ST.clients[ST.active];
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
+      <span style="font-size:13px;color:var(--tx2);">Cliente: <strong>${clientName}</strong></span>
+      <button onclick="editClient(${ST.active})" style="font-size:11px;padding:3px 10px;border-radius:20px;">✏️ Renomear</button>
+    </div>
+    <div class="mgrid" id="metrics"></div>
+    <div class="topbar">
+      <input type="month" id="mpick" onchange="onMonth()">
+      <div class="sdwrap" id="segfiltWrap">
+        <button class="sdbtn" onclick="toggleSegFilt()"><span id="segfiltLabel">Todos os segmentos</span> ▾</button>
+        <div class="sddd" id="segfiltDD">
+          <div class="sdddh">
+            <button class="bs" onclick="selAllSegs()">Todos</button>
+            <button class="bs" onclick="clearSegs()">Nenhum</button>
+          </div>
+          <div id="segfiltOpts"></div>
+        </div>
+      </div>
+      <div class="searchwrap">
+        <div class="searchbox">
+          <input class="searchinp" type="text" id="searchinp" placeholder="🔍 Buscar subreddit..." oninput="onSearch(this.value)" onkeydown="onSearchKey(event)">
+          <button class="searchclear" id="searchclear" onclick="clearSearch()">×</button>
+        </div>
+        <button style="font-size:11px;padding:3px 8px;border-radius:var(--rs);" id="searchnav_up" onclick="searchStep(-1)" style="display:none;">↑</button>
+        <button style="font-size:11px;padding:3px 8px;border-radius:var(--rs);" id="searchnav_dn" onclick="searchStep(1)" style="display:none;">↓</button>
+        <span class="searchcount" id="searchcount"></span>
+      </div>
+      <div style="margin-left:auto"><button onclick="expCSV()" style="font-size:12px;padding:5px 12px;">Exportar CSV</button></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">Tabela de views 24h — clique para editar</div>
+      <div class="gwrap" id="gwrap"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:1.25rem;margin-bottom:1.25rem;">
+      <div class="card" style="margin-bottom:0;">
+        <div class="ctitle">Gráfico de evolução — views 24h</div>
+        <div class="ccontrols">
+          <span style="font-size:12px;color:var(--tx3);">Acompanha o segmento selecionado na tabela</span>
+        </div>
+        <div class="cleg" id="cleg"></div>
+        <div class="cwrap"><canvas id="chart" role="img" aria-label="Evolução por subreddit">Gráfico.</canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="ctitle">🏆 Top 10 subreddits — views 24h</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tbody id="top10body"></tbody>
+        </table>
+      </div>
+    </div>`;
+  initMonth();updSegFilt();updMetrics();buildGrid();
+}
+
+function initMonth(){
+  const el=document.getElementById('mpick');
+  if(el)el.value=`${ST.year}-${String(ST.month+1).padStart(2,'0')}`;
+}
+function onMonth(){
+  const v=document.getElementById('mpick').value;if(!v)return;
+  const[y,m]=v.split('-');ST.year=parseInt(y);ST.month=parseInt(m)-1;
+  buildGrid();updMetrics();updChart();
+}
+function updSegFilt(){renderSegFiltOpts();updSegFiltLabel();}
+function toggleSegFilt(){const dd=document.getElementById('segfiltDD');if(dd)dd.classList.toggle('open');}
+function renderSegFiltOpts(){
+  const c=document.getElementById('segfiltOpts');if(!c)return;
+  c.innerHTML=SEGS.filter(s=>activeSubs(s).length>0).map(s=>`
+    <label class="sopt">
+      <input type="checkbox" ${ST.selSegs.length===0||ST.selSegs.includes(s)?'checked':''} onchange="togSegFilt('${s}')">
+      <span class="dot" style="background:${sbg(s)};border:1px solid ${sfg(s)};"></span>
+      <span>${s}</span>
+    </label>`).join('');
+}
+function togSegFilt(seg){
+  if(ST.selSegs.length===0) ST.selSegs=[...SEGS.filter(s=>activeSubs(s).length>0)];
+  const i=ST.selSegs.indexOf(seg);
+  if(i>-1)ST.selSegs.splice(i,1); else ST.selSegs.push(seg);
+  if(ST.selSegs.length===SEGS.filter(s=>activeSubs(s).length>0).length) ST.selSegs=[];
+  updSegFiltLabel();renderSegFiltOpts();buildGrid();updChart();
+}
+function selAllSegs(){ST.selSegs=[];updSegFiltLabel();renderSegFiltOpts();buildGrid();updChart();}
+function clearSegs(){ST.selSegs=[SEGS.filter(s=>activeSubs(s).length>0)[0]||SEGS[0]];updSegFiltLabel();renderSegFiltOpts();buildGrid();updChart();}
+function updSegFiltLabel(){
+  const el=document.getElementById('segfiltLabel');if(!el)return;
+  const n=ST.selSegs.length;
+  el.textContent=n===0?'Todos os segmentos':n===1?ST.selSegs[0]:`${n} segmentos`;
+}
+function getActiveSegs(){
+  return ST.selSegs.length===0?SEGS.filter(s=>activeSubs(s).length>0):ST.selSegs.filter(s=>activeSubs(s).length>0);
+}
+function updMetrics(){
+  const el=document.getElementById('metrics');if(!el)return;
+  const client=ST.clients[ST.active];
+  const pfx=`${client}|${ST.year}-${String(ST.month+1).padStart(2,'0')}`;
+  let v=0;
+  Object.entries(ST.data).forEach(([k,val])=>{
+    if(!k.startsWith(pfx))return;
+    if(k.endsWith('|views'))v+=Number(val)||0;
+  });
+  const d=dim(ST.year,ST.month);
+  el.innerHTML=`
+    <div class="mcard"><div class="mlabel">Views 24h no mês</div><div class="mval">${v.toLocaleString('pt-BR')}</div><div class="msub">${MN[ST.month]}</div></div>
+    <div class="mcard"><div class="mlabel">Média views 24h/dia</div><div class="mval">${d?Math.round(v/d).toLocaleString('pt-BR'):0}</div><div class="msub">${d} dias</div></div>
+    <div class="mcard"><div class="mlabel">Subreddits ativos</div><div class="mval">${allActive().length}</div><div class="msub">${SEGS.length} segmentos</div></div>`;
+}
+
+// ── GRID ──
+function buildGrid(){
+  const el=document.getElementById('gwrap');if(!el)return;
+  const show=getActiveSegs();
+  if(!show.length){el.innerHTML=`<div style="padding:2rem;text-align:center;color:var(--tx3);font-size:13px;">Nenhum subreddit ativo. Ative subreddits em "Gerenciar subreddits".</div>`;return;}
+  const days=dim(ST.year,ST.month);const tod=today();
+  let th1=`<tr><th class="dh" rowspan="2" style="border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);padding:0 10px;font-size:11px;color:var(--tx3);position:sticky;top:0;z-index:7;">DIA</th>`;
+  show.forEach((seg,si)=>{
+    const subs=activeSubs(seg);
+    th1+=`<th colspan="${subs.length}" style="padding:5px 8px;text-align:center;font-size:10px;font-weight:700;background:${sbg(seg)};color:${sfg(seg)};position:sticky;top:0;z-index:5;${si<show.length-1?'border-right:2px solid var(--bg);':''}">${seg}</th>`;
+  });
+  th1+=`</tr>`;
+  let th2=`<tr>`;
+  show.forEach((seg,si)=>{
+    const subs=activeSubs(seg);const isLast=si===show.length-1;
+    subs.forEach((sub,subi)=>{
+      const isLastSub=subi===subs.length-1;
+      th2+=`<th style="padding:3px 6px;text-align:center;font-size:10px;color:${sfg(seg)};background:${sbg(seg)}cc;position:sticky;top:25px;z-index:5;border-right:${isLastSub&&!isLast?'2px solid var(--bg)':'0.5px solid var(--bdr)'};border-bottom:1px solid var(--bdr);min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${sub} — Views 24h">${sub}</th>`;
+    });
+  });
+  th2+=`</tr>`;
+  let body='';
+  for(let d=1;d<=days;d++){
+    const date=ds(ST.year,ST.month,d);
+    const dow=new Date(ST.year,ST.month,d).getDay();
+    const isWk=dow===0||dow===6;const isTd=date===tod;
+    body+=`<tr><td class="dc${isTd?' td':isWk?' wk':''}">${String(d).padStart(2,'0')} ${DN[dow]}</td>`;
+    show.forEach((seg,si)=>{
+      const subs=activeSubs(seg);const isLast=si===show.length-1;
+      subs.forEach((sub,subi)=>{
+        const isLastSub=subi===subs.length-1;
+        const vv=gv(date,sub,'views');
+        body+=`<td class="ic${isLastSub&&!isLast?' sdiv':''}"><input class="ci${vv?' hv':''}" type="number" min="0" value="${vv}" data-d="${date}" data-s="${sub}" data-m="views" onchange="oc(this)" oninput="oi(this)"></td>`;
+      });
+    });
+    body+=`</tr>`;
+  }
+  el.innerHTML=`<table class="gtable"><thead>${th1}${th2}</thead><tbody>${body}</tbody></table>`;
+  updTop10();
+  updChart();
+}
+function oc(inp){const{d,s,m}=inp.dataset;const v=inp.value.trim();sv(d,s,m,v===''?'':Number(v));inp.classList.toggle('hv',v!=='');updTop10();}
+function oi(inp){inp.classList.toggle('hv',inp.value.trim()!=='');}
+
+// ── TOP 10 ──
+function updTop10(){
+  const el=document.getElementById('top10body');if(!el)return;
+  const client=ST.clients[ST.active];
+  const pfx=`${client}|${ST.year}-${String(ST.month+1).padStart(2,'0')}`;
+  const totals={};
+  Object.entries(ST.data).forEach(([k,val])=>{
+    if(!k.startsWith(pfx)||!k.endsWith('|views'))return;
+    const sub=k.split('|')[2];
+    totals[sub]=(totals[sub]||0)+Number(val)||0;
+  });
+  const sorted=Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  if(!sorted.length){el.innerHTML=`<tr><td colspan="3" style="text-align:center;padding:1.5rem;color:var(--tx3);font-size:13px;">Nenhum dado ainda</td></tr>`;return;}
+  const max=sorted[0][1]||1;
+  el.innerHTML=sorted.map(([sub,views],i)=>{
+    const pct=Math.round((views/max)*100);
+    const seg=SEGS.find(s=>(ST.segs[s]||[]).includes(sub))||'';
+    return `<tr>
+      <td style="padding:8px 12px;font-size:13px;font-weight:600;color:var(--tx3);width:30px;">${i+1}</td>
+      <td style="padding:8px 4px;">
+        <div style="font-size:12px;font-weight:500;color:var(--tx);margin-bottom:4px;">${sub}</div>
+        <div style="height:5px;background:var(--surf2);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${colSub(sub)};border-radius:3px;transition:width .3s;"></div>
+        </div>
+      </td>
+      <td style="padding:8px 12px;font-size:13px;font-weight:600;color:var(--tx);text-align:right;white-space:nowrap;">${views.toLocaleString('pt-BR')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── CHART ──
+let CI=null;
+function setCM(m){
+  ST.cm=m;
+  document.getElementById('bmv').className='bm'+(m==='views'?' active':'');
+  document.getElementById('bmu').className='bm'+(m==='upvotes'?' active':'');
+  updChart();
+}
+function toggleDD(){const d=document.getElementById('sddd');if(d){d.classList.toggle('open');if(d.classList.contains('open'))renderDDOpts();}}
+document.addEventListener('click',e=>{if(!e.target.closest('.sdwrap')){const d=document.getElementById('sddd');if(d)d.classList.remove('open');}});
+function renderDDOpts(){
+  const c=document.getElementById('ddopts');if(!c)return;
+  c.innerHTML=SEGS.map(seg=>{
+    const subs=activeSubs(seg);if(!subs.length)return '';
+    return `<div class="gl">${seg}</div>`+subs.map(s=>`<label class="sopt"><input type="checkbox" ${ST.csubs.includes(s)?'checked':''} onchange="togCS('${s}')"><span class="dot" style="background:${colSub(s)};"></span><span>${s}</span></label>`).join('');
+  }).join('');
+}
+function togCS(s){const i=ST.csubs.indexOf(s);if(i>-1)ST.csubs.splice(i,1);else ST.csubs.push(s);updDDLbl();updChart();}
+function selAll(){ST.csubs=[...allActive()];renderDDOpts();updDDLbl();updChart();}
+function clearSel(){ST.csubs=[];renderDDOpts();updDDLbl();updChart();}
+function updDDLbl(){const el=document.getElementById('ddlbl');if(!el)return;const n=ST.csubs.length;el.textContent=n===0?'Selecionar subreddits':n===1?ST.csubs[0]:`${n} subreddits`;}
+function updChart(){
+  const ctx=document.getElementById('chart');if(!ctx)return;
+  const days=dim(ST.year,ST.month);
+  const labels=Array.from({length:days},(_,i)=>{const d=i+1;const dow=new Date(ST.year,ST.month,d).getDay();return `${String(d).padStart(2,'0')} ${DN[dow]}`;});
+  // Use segment filter from table
+  const show=getActiveSegs().flatMap(s=>activeSubs(s)).slice(0,8);
+  const datasets=show.map(sub=>{
+    const col=colSub(sub);
+    return {label:sub,data:Array.from({length:days},(_,i)=>{const v=gv(ds(ST.year,ST.month,i+1),sub,'views');return v===''?null:Number(v);}),borderColor:col,backgroundColor:col+'18',fill:false,tension:.3,pointRadius:3,pointBackgroundColor:col,pointBorderColor:'#fff',pointBorderWidth:1.5,borderWidth:2,spanGaps:true};
+  });
+  const leg=document.getElementById('cleg');
+  if(leg)leg.innerHTML=show.map(s=>`<div class="li"><span class="ld" style="background:${colSub(s)};"></span><span>${s}</span></div>`).join('');
+  if(CI)CI.destroy();
+  CI=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:11}},grid:{color:'rgba(0,0,0,.05)'}},x:{ticks:{font:{size:10},autoSkip:true,maxTicksLimit:15,maxRotation:45},grid:{display:false}}}}});
+}
+
+// ── EXPORT ──
+function expCSV(){
+  const segs=getActiveSegs();
+  const subs=segs.flatMap(s=>activeSubs(s));
+  const days=dim(ST.year,ST.month);
+  const hdr=['Data',...subs.flatMap(s=>[`${s} Views`,`${s} Upvotes`])].join(',');
+  const rows=Array.from({length:days},(_,i)=>{const d=ds(ST.year,ST.month,i+1);return [d,...subs.flatMap(s=>[gv(d,s,'views')||0,gv(d,s,'upvotes')||0])].join(',');});
+  const blob=new Blob([[hdr,...rows].join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`reddit_${ST.clients[ST.active]}_${ST.year}-${String(ST.month+1).padStart(2,'0')}.csv`;a.click();
+}
+
+// ── SEG MANAGER ──
+function openSeg(){renderSeg();document.getElementById('segModal').classList.add('open');}
+function closeSeg(){
+  document.getElementById('segModal').classList.remove('open');
+  updSegFilt();buildGrid();updChart();renderDDOpts();updMetrics();
+}
+function renderSeg(){
+  document.getElementById('segBody').innerHTML=SEGS.map(seg=>{
+    const all=ST.segs[seg]||[];
+    const dis=ST.dis[seg]||[];
+    const act=all.filter(s=>!dis.includes(s)).length;
+    const id='inp_'+seg.replace(/\s+/g,'_');
+    return `<div class="sitem">
+      <div class="sih">
+        <span class="sbadge" style="background:${sbg(seg)};color:${sfg(seg)};">${seg}</span>
+        <span style="font-size:11px;color:var(--tx3);">${act}/${all.length} ativos</span>
+        <button class="bs" style="margin-left:auto;" onclick="togSegAll('${seg}')">${act===0&&all.length>0?'Ativar todos':'Desativar todos'}</button>
+      </div>
+      <div class="chips" id="chips_${seg.replace(/\s+/g,'_')}">
+        ${all.map(s=>{
+          const d=dis.includes(s);
+          return `<span class="chip${d?' dis':''}" onclick="togSub('${seg}','${s.replace(/'/g,"\\'")}')">
+            ${s} <span class="xtog" style="color:${d?'#27A068':'#999'};">${d?'＋':'−'}</span>
+          </span>`;
+        }).join('')}
+      </div>
+      <div class="arow">
+        <input type="text" id="${id}" placeholder="r/SubredditName" onkeydown="if(event.key==='Enter')addSub('${seg}')">
+        <button class="bp bs" onclick="addSub('${seg}')">+ Adicionar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function togSub(seg,sub){
+  if(!ST.dis[seg])ST.dis[seg]=[];
+  const i=ST.dis[seg].indexOf(sub);
+  if(i>-1)ST.dis[seg].splice(i,1); else ST.dis[seg].push(sub);
+  save();renderSeg();
+}
+
+function togSegAll(seg){
+  const all=ST.segs[seg]||[];
+  const dis=ST.dis[seg]||[];
+  const act=all.filter(s=>!dis.includes(s)).length;
+  ST.dis[seg]=act>0?[...all]:[];
+  save();renderSeg();
+}
+
+function addSub(seg){
+  const id='inp_'+seg.replace(/\s+/g,'_');
+  const inp=document.getElementById(id);
+  if(!inp){console.warn('Input not found:',id);return;}
+  const val=inp.value.trim();if(!val)return;
+  const name=val.startsWith('r/')?val:'r/'+val;
+  if(!ST.segs[seg])ST.segs[seg]=[];
+  if(!ST.segs[seg].includes(name)){ST.segs[seg].push(name);save();}
+  inp.value='';renderSeg();
+}
+
+document.getElementById('segModal').addEventListener('click',e=>{if(e.target===document.getElementById('segModal'))closeSeg();});
+
+// ── GOOGLE SHEETS ──
+let gsToken=null;let gsTClient=null;let gsSaveT=null;
+
+function setSS(st,lbl){
+  const d=document.getElementById('sdot');const l=document.getElementById('slabel');
+  if(d)d.className='sdot'+(st?' '+st:'');if(l)l.textContent=lbl;
+}
+
+function initGS(){
+  if(!window.google||!window.google.accounts)return;
+  gsTClient=google.accounts.oauth2.initTokenClient({
+    client_id:GS_CLIENT_ID,scope:GS_SCOPE,
+    callback:async(r)=>{
+      if(r.error){setSS('err','Erro ao conectar');return;}
+      gsToken=r.access_token;
+      document.getElementById('gbtn').textContent='Google ✓';
+      setSS('busy','Carregando dados...');
+      await gsLoad();
+    }
+  });
+}
+
+function handleAuth(){
+  if(!gsTClient){setSS('err','Google não carregou ainda, aguarde');return;}
+  gsTClient.requestAccessToken();
+}
+
+async function gsReq(method,range,values){
+  if(!gsToken)return null;
+  const base=`https://sheets.googleapis.com/v4/spreadsheets/${GS_SHEET_ID}`;
+  let url,body,rm=method;
+  if(method==='GET'){url=`${base}/values/${encodeURIComponent(range)}`;}
+  else if(method==='PUT'){url=`${base}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;body=JSON.stringify({range,majorDimension:'ROWS',values});}
+  else if(method==='CLEAR'){url=`${base}/values/${encodeURIComponent(range)}:clear`;rm='POST';}
+  try{
+    const res=await fetch(url,{method:rm,headers:{'Authorization':'Bearer '+gsToken,'Content-Type':'application/json'},body});
+    if(!res.ok){if(res.status===401){gsToken=null;setSS('err','Sessão expirada');return null;}return null;}
+    return await res.json();
+  }catch(e){return null;}
+}
+
+async function gsEnsure(){
+  try{
+    const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GS_SHEET_ID}`,{headers:{'Authorization':'Bearer '+gsToken}});
+    if(!res.ok)return;
+    const info=await res.json();
+    const names=info.sheets.map(s=>s.properties.title);
+    const missing=['Data','Config'].filter(n=>!names.includes(n));
+    if(!missing.length)return;
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GS_SHEET_ID}:batchUpdate`,{
+      method:'POST',headers:{'Authorization':'Bearer '+gsToken,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:missing.map(t=>({addSheet:{properties:{title:t}}}))})
+    });
+  }catch(e){}
+}
+
+async function gsLoad(){
+  try{
+    await gsEnsure();
+    // Config
+    const cr=await gsReq('GET','Config!A1');
+    if(cr&&cr.values&&cr.values[0]&&cr.values[0][0]){
+      try{
+        const cfg=JSON.parse(cr.values[0][0]);
+        if(cfg.clients&&cfg.clients.length)ST.clients=cfg.clients;
+        if(cfg.segs){
+          // Merge loaded segs with DEF — always keep DEF subs as base
+          SEGS.forEach(seg=>{
+            const loaded=cfg.segs[seg]||[];
+            const def=DEF[seg]||[];
+            // union: all DEF subs + any extra added by user
+            const merged=[...new Set([...def,...loaded])];
+            ST.segs[seg]=merged;
+          });
+        }
+        if(cfg.dis){
+          // Only keep disabled entries for subs that still exist
+          ST.dis={};
+          Object.entries(cfg.dis).forEach(([seg,subs])=>{
+            if(ST.segs[seg])ST.dis[seg]=subs.filter(s=>ST.segs[seg].includes(s));
+          });
+        }
+        if(ST.active>=ST.clients.length)ST.active=0;
+      }catch(e){}
+    }
+    // Data
+    const dr=await gsReq('GET','Data!A:E');
+    ST.data={};
+    if(dr&&dr.values){
+      dr.values.slice(1).forEach(r=>{
+        const[client,date,sub,views,upvotes]=r;
+        if(!client||!date||!sub)return;
+        if(views!=null&&views!=='')ST.data[`${client}|${date}|${sub}|views`]=Number(views)||0;
+        if(upvotes!=null&&upvotes!=='')ST.data[`${client}|${date}|${sub}|upvotes`]=Number(upvotes)||0;
+      });
+    }
+    // backup to localStorage
+    localStorage.setItem('rs_clients',JSON.stringify(ST.clients));
+    localStorage.setItem('rs_segs',JSON.stringify(ST.segs));
+    localStorage.setItem('rs_dis',JSON.stringify(ST.dis));
+    localStorage.setItem('rs_data',JSON.stringify(ST.data));
+    setSS('ok','Sincronizado ✓');
+    buildAll();
+  }catch(e){
+    setSS('err','Erro ao carregar');
+    buildAll();
+  }
+}
+
+async function gsSave(){
+  if(!gsToken)return;
+  setSS('busy','Salvando...');
+  try{
+    await gsEnsure();
+    const cfg=JSON.stringify({clients:ST.clients,segs:ST.segs,dis:ST.dis});
+    await gsReq('PUT','Config!A1',[[cfg]]);
+    const rows=[['cliente','data','subreddit','views','upvotes']];
+    Object.entries(ST.data).forEach(([k,v])=>{
+      const p=k.split('|');if(p.length!==4)return;
+      const[client,date,sub,metric]=p;
+      const ex=rows.find(r=>r[0]===client&&r[1]===date&&r[2]===sub);
+      if(ex){if(metric==='views')ex[3]=v;else ex[4]=v;}
+      else{const nr=[client,date,sub,'',''];if(metric==='views')nr[3]=v;else nr[4]=v;rows.push(nr);}
+    });
+    await gsReq('CLEAR','Data!A:E');
+    if(rows.length>1)await gsReq('PUT','Data!A1',rows);
+    setSS('ok','Salvo ✓');
+  }catch(e){setSS('err','Erro ao salvar');}
+}
+
+function schedGSave(){
+  if(!gsToken)return;
+  clearTimeout(gsSaveT);
+  gsSaveT=setTimeout(gsSave,1500);
+}
+
+// ── SEARCH ──
+let searchMatches=[];let searchIdx=0;
+
+function showNavBtns(show){
+  const u=document.getElementById('searchnav_up');
+  const d=document.getElementById('searchnav_dn');
+  if(u)u.style.display=show?'inline-block':'none';
+  if(d)d.style.display=show?'inline-block':'none';
+}
+
+function onSearch(val){
+  const clear=document.getElementById('searchclear');
+  if(clear)clear.classList.toggle('vis',val.length>0);
+  if(!val.trim()){searchMatches=[];searchIdx=0;showNavBtns(false);const sc=document.getElementById('searchcount');if(sc)sc.textContent='';clearHighlights();return;}
+  doSearch(val.trim());
+}
+
+function doSearch(q){
+  clearHighlights();
+  const table=document.getElementById('gwrap');
+  if(!table){searchMatches=[];showNavBtns(false);return;}
+  const headers=table.querySelectorAll('thead tr:nth-child(2) th');
+  // Normalize query: remove r/ prefix and lowercase for comparison
+  const qNorm=q.toLowerCase().replace(/^r\//,'');
+  searchMatches=[];
+  headers.forEach((th,i)=>{
+    const name=th.textContent.toLowerCase().replace(/^r\//,'').trim();
+    if(name.includes(qNorm))searchMatches.push(i);
+  });
+  showNavBtns(searchMatches.length>0);
+  if(searchMatches.length){searchIdx=0;highlightCol(searchMatches[0],true);}
+  updSearchCount();
+}
+
+function highlightCol(colIdx,scroll){
+  const table=document.getElementById('gwrap');if(!table)return;
+  // highlight header
+  const ths=table.querySelectorAll('thead tr:nth-child(2) th');
+  if(ths[colIdx])ths[colIdx].classList.add('col-highlight-active');
+  // highlight all cells in that column — each sub has 2 cols (V+U), colIdx*2+1 offset after sticky day col
+  const colOffset=(colIdx*2)+1; // +1 for day cell
+  table.querySelectorAll('tbody tr').forEach(tr=>{
+    const cells=tr.querySelectorAll('td');
+    if(cells[colOffset])cells[colOffset].classList.add('col-highlight-active');
+    if(cells[colOffset+1])cells[colOffset+1].classList.add('col-highlight-active');
+  });
+  if(scroll&&ths[colIdx])ths[colIdx].scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+}
+
+function clearHighlights(){
+  const table=document.getElementById('gwrap');if(!table)return;
+  table.querySelectorAll('.col-highlight-active,.col-highlight').forEach(el=>{
+    el.classList.remove('col-highlight-active','col-highlight');
+  });
+}
+
+function searchStep(dir){
+  if(!searchMatches.length)return;
+  clearHighlights();
+  searchIdx=(searchIdx+dir+searchMatches.length)%searchMatches.length;
+  highlightCol(searchMatches[searchIdx],true);
+  updSearchCount();
+}
+
+function onSearchKey(e){
+  if(e.key==='Enter'){e.shiftKey?searchStep(-1):searchStep(1);}
+  if(e.key==='Escape')clearSearch();
+}
+
+function clearSearch(){
+  const inp=document.getElementById('searchinp');
+  const clear=document.getElementById('searchclear');
+  const sc=document.getElementById('searchcount');
+  if(inp)inp.value='';if(clear)clear.classList.remove('vis');if(sc)sc.textContent='';
+  searchMatches=[];searchIdx=0;showNavBtns(false);clearHighlights();
+}
+
+function updSearchCount(){
+  const el=document.getElementById('searchcount');
+  if(el)el.textContent=searchMatches.length?`${searchIdx+1}/${searchMatches.length}`:'0 resultados';
+}
+
+window.addEventListener('load',()=>setTimeout(initGS,800));
+
+function buildAll(){renderTabs();buildMain();}
+buildAll();
+</script>
+</body>
+</html>
